@@ -1,0 +1,37 @@
+@echo off
+REM ============================================================================
+REM  configure.bat  — detect this machine's LAN IPv4 and generate config.
+REM  Writes:  .env (LIVEKIT_NODE_IP), livekit.yaml, and ingress.yaml (from templates).
+REM  Re-run this whenever your LAN IP changes.
+REM ============================================================================
+setlocal enabledelayedexpansion
+
+echo Detecting LAN IPv4 address...
+for /f "delims=" %%i in ('powershell -NoProfile -Command ^
+  "(Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -ne $null -and $_.NetAdapter.Status -eq 'Up' } | Select-Object -First 1 -ExpandProperty IPv4Address).IPAddress"') do set "IP=%%i"
+
+if "%IP%"=="" (
+  echo.
+  echo [ERROR] Could not auto-detect a LAN IP.
+  echo         Run "ipconfig", find your IPv4 Address, then edit .env and
+  echo         livekit.yaml manually ^(replace __NODE_IP__^).
+  exit /b 1
+)
+
+echo Detected LAN IP: %IP%
+
+> "%~dp0.env" echo LIVEKIT_NODE_IP=%IP%
+
+powershell -NoProfile -Command ^
+  "(Get-Content '%~dp0livekit.template.yaml') -replace '__NODE_IP__','%IP%' | Set-Content '%~dp0livekit.yaml'"
+
+powershell -NoProfile -Command ^
+  "(Get-Content '%~dp0ingress.template.yaml') -replace '__NODE_IP__','%IP%' | Set-Content '%~dp0ingress.yaml'"
+
+echo.
+echo Wrote:  .env, livekit.yaml, ingress.yaml   (node_ip = %IP%)
+echo.
+echo  Unity client serverUrl should be:   ws://%IP%:7880
+echo.
+endlocal
+pause

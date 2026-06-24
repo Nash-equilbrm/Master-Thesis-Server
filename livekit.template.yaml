@@ -1,0 +1,35 @@
+# =============================================================================
+# LiveKit server config  —  DEV / LOCAL TESTING ONLY (insecure default keys).
+# -----------------------------------------------------------------------------
+# Do NOT edit this template directly for node_ip. Run `configure.bat`, which
+# copies this file to `livekit.yaml` and replaces __NODE_IP__ with your LAN IPv4.
+# =============================================================================
+
+port: 7880                 # signaling: WebSocket + HTTP API
+bind_addresses:
+  - ""                     # listen on all interfaces
+
+rtc:
+  tcp_port: 7881           # RTC over TCP (ICE/TCP fallback)
+  udp_port: 7882           # single-port UDP mux  -> only ONE udp port to publish
+  use_external_ip: false
+  # node_ip MUST be reachable from BOTH the Unity host and the ingress container.
+  # On Docker Desktop (Windows) that means your machine's LAN IPv4 (e.g. 192.168.x.x).
+  node_ip: __NODE_IP__
+
+# WHIP/RTMP ingest endpoints advertised to the ingress service.
+# The path "/w" is where the ingress WHIP server accepts POSTs; if WHIP returns
+# 404, this is the first thing to adjust (see README troubleshooting).
+ingress:
+  whip_base_url: http://__NODE_IP__:8080/w
+  rtmp_base_url: rtmp://__NODE_IP__:1935/x
+
+redis:
+  address: redis:6379
+
+# DEV keys only. api_secret must be >= 32 chars. Regenerate for anything real.
+keys:
+  devkey: secretsecretsecretsecretsecret00
+
+logging:
+  level: info
