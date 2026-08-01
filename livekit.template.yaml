@@ -31,5 +31,13 @@ redis:
 keys:
   devkey: secretsecretsecretsecretsecret00
 
+# Notifies the registration service of participant/room lifecycle events so it
+# can free a cam slot when a camera disconnects, without the client having to
+# call POST /unregister itself.
+webhook:
+  api_key: devkey
+  urls:
+    - http://registration:3000/webhook
+
 logging:
   level: info

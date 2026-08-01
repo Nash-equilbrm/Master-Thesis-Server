@@ -37,6 +37,21 @@ services:
       - ./ingress.yaml:/etc/ingress.yaml:ro
     networks: [livekit]
 
+  registration:
+    build: ./registration-service
+    restart: unless-stopped
+    depends_on: [livekit]
+    environment:
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=secretsecretsecretsecretsecret00
+      - LIVEKIT_NODE_IP=${LIVEKIT_NODE_IP}
+      - LIVEKIT_WS_PORT=7880
+      - ROOM_NAME=studio
+      - SLOT_COUNT=10
+    ports:
+      - "3000:3000"          # POST /register, POST /unregister
+    networks: [livekit]
+
 networks:
   livekit:
     driver: bridge

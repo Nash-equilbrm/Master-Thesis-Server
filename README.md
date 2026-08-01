@@ -136,6 +136,29 @@ streaming-server/
 │   └── whip_cam1.json         # WHIP ingress definition (room cam1)
 ├── scripts/
 │   └── create_ingress.bat     # create the cam1 WHIP ingress
-└── tokens/
-    └── create_token.bat       # JWT for the Unity client (room cam1)
+├── tokens/
+│   └── create_token.bat       # JWT for the Unity client (room cam1)
+└── registration-service/      # Node.js: POST /register, dynamic cam1-10 slot assignment
+    ├── server.js
+    ├── package.json
+    └── Dockerfile
+```
+
+---
+
+## Registration service
+
+Assigns each camera machine a free slot (`cam1`-`cam10`) and mints its LiveKit
+JWT. Runs as its own container (`registration`), started with the rest of the
+stack via `docker compose up -d`.
+
+- `POST /register` → `{ identity, token, livekit_url }` (first-come-first-served)
+- `POST /unregister` `{ identity }` → frees a slot manually
+- LiveKit is configured (`webhook:` in `livekit.yaml`) to POST to `/webhook` on
+  participant disconnect, so a slot is also freed automatically if the camera
+  machine drops without calling `/unregister`.
+- State is in-memory only — restarting the container resets all slots to free.
+
+```bat
+curl -X POST http://<YOUR_IP>:3000/register
 ```
