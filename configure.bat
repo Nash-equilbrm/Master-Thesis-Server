@@ -2,7 +2,9 @@
 REM ============================================================================
 REM  configure.bat  — detect this machine's LAN IPv4 and generate config.
 REM  Writes:  .env (LIVEKIT_NODE_IP), livekit.yaml, and ingress.yaml (from templates).
-REM  Re-run this whenever your LAN IP changes.
+REM  Called automatically by start.bat before every "docker compose up", so the
+REM  IP is always fresh. Run it manually only if you want to regenerate config
+REM  without also starting the stack.
 REM ============================================================================
 setlocal enabledelayedexpansion
 
@@ -34,4 +36,4 @@ echo.
 echo  Unity client serverUrl should be:   ws://%IP%:7880
 echo.
 endlocal
-pause
+if "%~1"=="" pause

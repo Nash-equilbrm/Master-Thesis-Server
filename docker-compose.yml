@@ -1,5 +1,6 @@
 # LiveKit + Ingress + Redis  — local dev stack for the Multi-Camera Live Stream System.
-# Bring up with:  docker compose up -d   (after running configure.bat)
+# Bring up with:  start.bat   (auto-detects LAN IP fresh, then runs docker compose up -d)
+# Manual alternative: configure.bat, then  docker compose up -d
 services:
   redis:
     image: redis:7-alpine
