@@ -1,4 +1,5 @@
 import express from 'express';
+import { randomUUID } from 'crypto';
 import { AccessToken, WebhookReceiver } from 'livekit-server-sdk';
 
 const PORT = process.env.PORT || 3000;
@@ -42,6 +43,19 @@ async function mintToken(identity) {
   return at.toJwt();
 }
 
+async function mintViewerToken() {
+  const identity = `viewer-${randomUUID()}`;
+  const at = new AccessToken(API_KEY, API_SECRET, { identity, ttl: TOKEN_TTL });
+  at.addGrant({
+    room: ROOM_NAME,
+    roomJoin: true,
+    canPublish: false,
+    canSubscribe: true,
+    canPublishData: false,
+  });
+  return at.toJwt();
+}
+
 const app = express();
 app.use(express.json());
 
@@ -61,6 +75,16 @@ app.post('/register', async (req, res) => {
   } catch (err) {
     slots.set(identity, null);
     console.error('[registration] token mint failed', err);
+    res.status(500).json({ error: 'failed to mint token' });
+  }
+});
+
+app.post('/viewer-token', async (req, res) => {
+  try {
+    const token = await mintViewerToken();
+    res.json({ token, livekit_url: `ws://${NODE_IP}:${WS_PORT}` });
+  } catch (err) {
+    console.error('[registration] viewer token mint failed', err);
     res.status(500).json({ error: 'failed to mint token' });
   }
 });
