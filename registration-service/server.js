@@ -39,6 +39,7 @@ async function mintToken(identity) {
     canPublish: true,
     canSubscribe: false,
     canPublishData: false,
+    canUpdateOwnMetadata: true,
   });
   return at.toJwt();
 }
