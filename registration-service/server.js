@@ -31,10 +31,10 @@ function freeSlotByIdentity(identity) {
   return false;
 }
 
-async function mintToken(identity) {
+async function mintToken(identity, room) {
   const at = new AccessToken(API_KEY, API_SECRET, { identity, ttl: TOKEN_TTL });
   at.addGrant({
-    room: ROOM_NAME,
+    room,
     roomJoin: true,
     canPublish: true,
     canSubscribe: false,
@@ -44,11 +44,11 @@ async function mintToken(identity) {
   return at.toJwt();
 }
 
-async function mintViewerToken() {
-  const identity = `viewer-${randomUUID()}`;
+async function mintViewerToken(room, userId) {
+  const identity = userId ? `viewer-${userId}` : `viewer-${randomUUID()}`;
   const at = new AccessToken(API_KEY, API_SECRET, { identity, ttl: TOKEN_TTL });
   at.addGrant({
-    room: ROOM_NAME,
+    room,
     roomJoin: true,
     canPublish: false,
     canSubscribe: true,
@@ -61,6 +61,9 @@ const app = express();
 app.use(express.json());
 
 app.post('/register', async (req, res) => {
+  const { roomCode } = req.body ?? {};
+  const room = roomCode?.trim() || ROOM_NAME;
+
   const identity = assignSlot();
   if (!identity) {
     res.status(503).json({ error: 'no slots available' });
@@ -70,8 +73,8 @@ app.post('/register', async (req, res) => {
   slots.set(identity, { registeredAt: Date.now() });
 
   try {
-    const token = await mintToken(identity);
-    console.log(`[registration] assigned ${identity}`);
+    const token = await mintToken(identity, room);
+    console.log(`[registration] assigned ${identity} → room "${room}"`);
     res.json({ identity, token, livekit_url: `ws://${NODE_IP}:${WS_PORT}` });
   } catch (err) {
     slots.set(identity, null);
@@ -81,8 +84,11 @@ app.post('/register', async (req, res) => {
 });
 
 app.post('/viewer-token', async (req, res) => {
+  const { roomCode, userId } = req.body ?? {};
+  const room = roomCode?.trim() || ROOM_NAME;
+
   try {
-    const token = await mintViewerToken();
+    const token = await mintViewerToken(room, userId);
     res.json({ token, livekit_url: `ws://${NODE_IP}:${WS_PORT}` });
   } catch (err) {
     console.error('[registration] viewer token mint failed', err);
@@ -108,10 +114,10 @@ app.post('/webhook', express.raw({ type: 'application/webhook+json' }), async (r
   try {
     const event = await webhookReceiver.receive(req.body.toString(), req.get('Authorization'));
 
-    if (event.event === 'participant_left' && event.room?.name === ROOM_NAME) {
+    if (event.event === 'participant_left') {
       freeSlotByIdentity(event.participant?.identity);
-    } else if (event.event === 'room_finished' && event.room?.name === ROOM_NAME) {
-      for (const identity of slots.keys()) freeSlotByIdentity(identity);
+    } else if (event.event === 'room_finished') {
+      console.log(`[registration] room "${event.room?.name}" finished`);
     }
 
     res.status(200).end();
