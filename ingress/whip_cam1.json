@@ -1,8 +1,0 @@
-{
-  "input_type": "WHIP_INPUT",
-  "name": "webcam-cam1",
-  "room_name": "studio",
-  "participant_identity": "cam1",
-  "participant_name": "Camera 1 (Webcam)",
-  "enable_transcoding": true
-}
