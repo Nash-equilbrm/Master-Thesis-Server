@@ -1,0 +1,66 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docker-compose.yml"
+      - "livekit.template.yaml"
+      - "registration-service/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  build-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build registration-service image (validation only, not pushed)
+        run: docker build ./registration-service
+
+  deploy:
+    needs: build-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull latest code and rebuild on the EC2 instance
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/streaming-server
+            git pull origin main
+            docker compose up -d --build
+            docker compose ps
+
+      - name: Smoke test — LiveKit signaling port
+        run: |
+          status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "http://${{ secrets.EC2_HOST }}:7880/")
+          echo "livekit http status: $status"
+          test "$status" = "200"
+
+      - name: Smoke test — registration /register
+        run: |
+          body=$(curl -sS --max-time 10 -X POST "http://${{ secrets.EC2_HOST }}:3000/register" \
+            -H "Content-Type: application/json" -d '{}')
+          echo "$body"
+          echo "$body" | grep -q '"identity"'
+          echo "$body" | grep -q '"livekit_url"'
+
+      - name: Free the throwaway camera slot consumed by the smoke test
+        if: always()
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/streaming-server
+            docker compose restart registration

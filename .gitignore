@@ -2,3 +2,8 @@
 .env
 livekit.yaml
 ingress.yaml
+
+# AWS deployment artifacts — machine-specific / secrets, never commit
+*.pem
+.sg_id.txt
+docker-compose.override.yml
