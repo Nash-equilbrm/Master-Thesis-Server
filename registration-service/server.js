@@ -11,6 +11,20 @@ const ROOM_NAME = process.env.ROOM_NAME || 'studio';
 const SLOT_COUNT = Number(process.env.SLOT_COUNT || 10);
 const TOKEN_TTL = process.env.TOKEN_TTL || '24h';
 
+// ChArUco board identity every camera must render/calibrate against — kept server-side
+// so cameras can't silently drift onto different board parameters from each other.
+const CALIBRATION_CONFIG = {
+  dictionaryId: Number(process.env.CALIBRATION_DICTIONARY_ID || 10), // OpenCV Aruco.DICT_5X5_250
+  squaresX: Number(process.env.CALIBRATION_SQUARES_X || 5),
+  squaresY: Number(process.env.CALIBRATION_SQUARES_Y || 7),
+  squareLengthMm: Number(process.env.CALIBRATION_SQUARE_LENGTH_MM || 30.0),
+  markerLengthMm: Number(process.env.CALIBRATION_MARKER_LENGTH_MM || 15.0),
+};
+
+// identity (e.g. "cam1") → { cameraName, intrinsics, extrinsics }. Overwritten wholesale
+// by each new /calibration-data POST — only the latest calibration per slot is kept.
+const calibrationData = new Map();
+
 // cam1..camN, first-come-first-served. null = free, object = assigned.
 const slots = new Map();
 for (let i = 1; i <= SLOT_COUNT; i++) slots.set(`cam${i}`, null);
@@ -148,6 +162,35 @@ app.post('/viewer-token', async (req, res) => {
     console.error('[registration] viewer token mint failed', err);
     res.status(500).json({ error: 'failed to mint token' });
   }
+});
+
+app.get('/calibration-config', (req, res) => {
+  res.json(CALIBRATION_CONFIG);
+});
+
+app.post('/calibration-data', (req, res) => {
+  const { identity, cameraName, intrinsics, extrinsics } = req.body ?? {};
+  if (!identity || !intrinsics || !extrinsics) {
+    res.status(400).json({ error: 'identity, intrinsics, and extrinsics are required' });
+    return;
+  }
+
+  calibrationData.set(identity, { cameraName: cameraName || identity, intrinsics, extrinsics });
+  console.log(`[registration] stored calibration for ${identity}`);
+  res.status(204).end();
+});
+
+app.get('/calibration-data/pair', (req, res) => {
+  const { cam1, cam2 } = req.query;
+  const data1 = cam1 && calibrationData.get(cam1);
+  const data2 = cam2 && calibrationData.get(cam2);
+
+  if (!data1 || !data2) {
+    res.status(404).json({ error: 'calibration not found for one or both identities' });
+    return;
+  }
+
+  res.json({ cam1: data1, cam2: data2 });
 });
 
 app.post('/unregister', (req, res) => {
