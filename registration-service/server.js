@@ -18,8 +18,8 @@ const CALIBRATION_CONFIG = {
   dictionaryId: Number(process.env.CALIBRATION_DICTIONARY_ID || 10), // OpenCV Aruco.DICT_5X5_250
   squaresX: Number(process.env.CALIBRATION_SQUARES_X || 5),
   squaresY: Number(process.env.CALIBRATION_SQUARES_Y || 7),
-  squareLengthMm: Number(process.env.CALIBRATION_SQUARE_LENGTH_MM || 30.0),
-  markerLengthMm: Number(process.env.CALIBRATION_MARKER_LENGTH_MM || 15.0),
+  squareLengthMm: Number(process.env.CALIBRATION_SQUARE_LENGTH_MM || 40.0),
+  markerLengthMm: Number(process.env.CALIBRATION_MARKER_LENGTH_MM || 20.0),
 };
 
 // identity (e.g. "cam1") → { cameraName, intrinsics, extrinsics, calibratedAt }. Overwritten
