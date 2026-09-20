@@ -10,6 +10,7 @@ const WS_PORT = process.env.LIVEKIT_WS_PORT || '7880';
 const ROOM_NAME = process.env.ROOM_NAME || 'studio';
 const SLOT_COUNT = Number(process.env.SLOT_COUNT || 10);
 const TOKEN_TTL = process.env.TOKEN_TTL || '24h';
+const CALIBRATION_TTL_MS = Number(process.env.CALIBRATION_TTL_HOURS || 4) * 60 * 60 * 1000;
 
 // ChArUco board identity every camera must render/calibrate against — kept server-side
 // so cameras can't silently drift onto different board parameters from each other.
@@ -21,9 +22,36 @@ const CALIBRATION_CONFIG = {
   markerLengthMm: Number(process.env.CALIBRATION_MARKER_LENGTH_MM || 15.0),
 };
 
-// identity (e.g. "cam1") → { cameraName, intrinsics, extrinsics }. Overwritten wholesale
-// by each new /calibration-data POST — only the latest calibration per slot is kept.
+// identity (e.g. "cam1") → { cameraName, intrinsics, extrinsics, calibratedAt }. Overwritten
+// wholesale by each new /calibration-data POST — only the latest calibration per slot is
+// kept. Each entry expires independently off its own calibratedAt (no bulk-clear), and only
+// while its slot is free — a still-connected device keeps its calibration no matter how old.
 const calibrationData = new Map();
+
+function clearExpiredCalibrations() {
+  const now = Date.now();
+  for (const [identity, data] of calibrationData) {
+    if (slots.get(identity)) continue; // still connected — keep using it regardless of age
+    if (now - data.calibratedAt > CALIBRATION_TTL_MS) {
+      calibrationData.delete(identity);
+      console.log(`[registration] expired calibration for ${identity}`);
+    }
+  }
+}
+
+setInterval(clearExpiredCalibrations, 15 * 60 * 1000);
+
+// Lazy check so a read between sweeps can't return calibration older than the TTL.
+function getFreshCalibration(identity) {
+  const data = calibrationData.get(identity);
+  if (!data) return null;
+  if (slots.get(identity)) return data; // still connected — keep using it regardless of age
+  if (Date.now() - data.calibratedAt > CALIBRATION_TTL_MS) {
+    calibrationData.delete(identity);
+    return null;
+  }
+  return data;
+}
 
 // cam1..camN, first-come-first-served. null = free, object = assigned.
 const slots = new Map();
@@ -175,15 +203,15 @@ app.post('/calibration-data', (req, res) => {
     return;
   }
 
-  calibrationData.set(identity, { cameraName: cameraName || identity, intrinsics, extrinsics });
+  calibrationData.set(identity, { cameraName: cameraName || identity, intrinsics, extrinsics, calibratedAt: Date.now() });
   console.log(`[registration] stored calibration for ${identity}`);
   res.status(204).end();
 });
 
 app.get('/calibration-data/pair', (req, res) => {
   const { cam1, cam2 } = req.query;
-  const data1 = cam1 && calibrationData.get(cam1);
-  const data2 = cam2 && calibrationData.get(cam2);
+  const data1 = cam1 && getFreshCalibration(cam1);
+  const data2 = cam2 && getFreshCalibration(cam2);
 
   if (!data1 || !data2) {
     res.status(404).json({ error: 'calibration not found for one or both identities' });
