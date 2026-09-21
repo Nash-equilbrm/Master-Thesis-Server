@@ -7,3 +7,6 @@ ingress.yaml
 *.pem
 .sg_id.txt
 docker-compose.override.yml
+
+# Editor
+.vscode/
